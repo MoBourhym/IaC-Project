@@ -1,7 +1,7 @@
 const http = require('http');
 
 const port = 3000;
-const version = 'v 2.417'; // Update this manually or via CI/CD later
+const version = 'v 2.418'; // Update this manually or via CI/CD later
 
 const server = http.createServer((req, res) => {
   if (req.url === '/') {
