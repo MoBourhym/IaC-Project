@@ -8,9 +8,12 @@ WORKDIR /usr/src/app
 COPY package.json ./
 RUN npm install
 
-# Copy the app code and .env file
+# Copy the app code
 COPY app.js ./
-COPY ../.env ./
+
+# Create a default .env file if one is not provided during deployment
+RUN echo "APP_VERSION=v 1.0" > .env && \
+    echo "PORT=3000" >> .env
 
 # Expose the port your app runs on
 EXPOSE 3000
