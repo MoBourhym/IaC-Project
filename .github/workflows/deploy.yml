@@ -27,37 +27,54 @@ jobs:
       - name: Read and Increment Version
         id: version
         run: |
-          VERSION=$(grep "const version" app/app.js | awk -F"'" '{print $2}' | sed 's/v /v/')
-          NEW_VERSION=$(echo $VERSION | awk -F'.' '{print $1"."($2+1)}')
-          sed -i "s/const version = 'v $VERSION'/const version = 'v $NEW_VERSION'/" app/app.js
+          # Extract version number from app.js, handling the space after 'v'
+          VERSION=$(grep "const version" app/app.js | awk -F"'" '{print $2}')
+          # Extract just the numeric part
+          VERSION_NUM=$(echo $VERSION | sed 's/v //')
+          # Increment the minor version
+          NEW_VERSION_NUM=$(echo $VERSION_NUM | awk -F'.' '{print $1"."($2+1)}')
+          # Update the version in app.js
+          sed -i "s/const version = '${VERSION}'/const version = 'v ${NEW_VERSION_NUM}'/" app/app.js
           # Create a clean Docker tag with no spaces or 'v' prefix
-          DOCKER_TAG=$(echo $NEW_VERSION | sed 's/v//g' | tr -d ' ')
+          DOCKER_TAG=$(echo $NEW_VERSION_NUM | tr -d ' ')
           echo "NEW_VERSION=$DOCKER_TAG" >> $GITHUB_ENV
+          
           # Set up git with token-based authentication
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           
-          # Configure git to use the GITHUB_TOKEN for authentication
+          # Configure git to use the token for authentication
           git remote set-url origin https://x-access-token:${{ secrets.AUTH_TOKEN }}@github.com/${{ github.repository }}.git
           
           git add app/app.js
-          git commit -m "Bump version to v $NEW_VERSION"
+          git commit -m "Bump version to v ${NEW_VERSION_NUM}"
           git push
 
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v4
         with:
-          context: .
+          context: ./app
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/glsid-app:${{ env.NEW_VERSION }}
 
       - name: Deploy to EC2
-        run: |
-          ssh -i ~/.ssh/your-key-pair.pem -o StrictHostKeyChecking=no ubuntu@<ec2-public-ip> << 'EOF'
-            sudo docker stop $(sudo docker ps -q) || true
-            sudo docker rm $(sudo docker ps -a -q) || true
-            sudo docker pull ${{ secrets.DOCKER_USERNAME }}/glsid-app:${{ env.NEW_VERSION }}
-            sudo docker run -d -p 3000:3000 ${{ secrets.DOCKER_USERNAME }}/glsid-app:${{ env.NEW_VERSION }}
-          EOF
         env:
           EC2_PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          NEW_VERSION: ${{ env.NEW_VERSION }}
+        run: |
+          # Set up SSH key
+          echo "$EC2_PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          
+          # Deploy to EC2
+          ssh -i private_key.pem -o StrictHostKeyChecking=no ubuntu@$EC2_HOST << EOF
+            sudo docker stop \$(sudo docker ps -q) || true
+            sudo docker rm \$(sudo docker ps -a -q) || true
+            sudo docker pull $DOCKER_USERNAME/glsid-app:$NEW_VERSION
+            sudo docker run -d -p 3000:3000 $DOCKER_USERNAME/glsid-app:$NEW_VERSION
+          EOF
+          
+          # Clean up SSH key
+          rm -f private_key.pem
