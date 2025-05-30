@@ -1,8 +1,7 @@
 const http = require('http');
-require('dotenv').config(); // Load environment variables from .env
 
-const port = process.env.PORT || 3000;
-const version = process.env.APP_VERSION || 'v 1.0'; // Fallback to 'v 1.0' if not set
+const port = 3000;
+const version = 'v 2.0'; // Update this manually or via CI/CD later
 
 const server = http.createServer((req, res) => {
   if (req.url === '/') {
