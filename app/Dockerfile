@@ -8,8 +8,9 @@ WORKDIR /usr/src/app
 COPY package.json ./
 RUN npm install
 
-# Copy the app code
+# Copy the app code and .env file
 COPY app.js ./
+COPY ../.env ./
 
 # Expose the port your app runs on
 EXPOSE 3000
